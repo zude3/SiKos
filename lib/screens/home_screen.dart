@@ -1,13 +1,27 @@
 import 'package:flutter/material.dart';
 
+import '../data/item_repository.dart';
+import '../models/item.dart';
+import '../routes/app_routes.dart';
+import '../widgets/state_views.dart';
+
 const _ink = Color(0xFF1E293B);
 const _muted = Color(0xFF64748B);
 const _line = Color(0xFFE2E8F0);
 const _teal = Color(0xFF0D9488);
 const _blue = Color(0xFF0EA5E9);
 
+enum ViewStatus { loading, success, error }
+
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  HomeScreen({
+    super.key,
+    ItemRepository? repository,
+    this.simulateError = false,
+  }) : repository = repository ?? ItemRepository();
+
+  final ItemRepository repository;
+  final bool simulateError;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -15,39 +29,95 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
+  ViewStatus _status = ViewStatus.loading;
+  List<Item> _items = [];
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    if (_status != ViewStatus.loading) {
+      setState(() => _status = ViewStatus.loading);
+    }
+
+    try {
+      final items = await widget.repository.fetchItems(
+        simulateError: widget.simulateError,
+      );
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _status = ViewStatus.success;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString().replaceFirst('Exception: ', '');
+        _status = ViewStatus.error;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FBFB),
-      body: SafeArea(
-        bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              sliver: SliverToBoxAdapter(child: _Header()),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              sliver: SliverToBoxAdapter(child: const _SearchBar()),
-            ),
-            SliverToBoxAdapter(child: _FilterRow()),
-            SliverPadding(
-              padding: const EdgeInsets.only(top: 8),
-              sliver: SliverToBoxAdapter(child: _PopularSection()),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              sliver: SliverToBoxAdapter(child: _NearbySection()),
-            ),
-          ],
-        ),
-      ),
+      body: SafeArea(bottom: false, child: _buildContent()),
       bottomNavigationBar: _BottomNavigation(
         selectedIndex: _selectedTab,
         onSelected: (index) => setState(() => _selectedTab = index),
       ),
+    );
+  }
+
+  Widget _buildContent() {
+    return switch (_status) {
+      ViewStatus.loading => const LoadingView(),
+      ViewStatus.error => ErrorView(
+        message: _errorMessage,
+        onRetry: _loadItems,
+      ),
+      ViewStatus.success => _buildLoadedContent(),
+    };
+  }
+
+  Widget _buildLoadedContent() {
+    if (_items.isEmpty) {
+      return const EmptyView(message: 'Belum ada data kos.');
+    }
+
+    final popularItems = _items.where((item) => item.isPopular).toList();
+    final nearbyItems = _items.where((item) => !item.isPopular).toList();
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          sliver: SliverToBoxAdapter(child: _Header()),
+        ),
+        const SliverPadding(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
+          sliver: SliverToBoxAdapter(child: _SearchBar()),
+        ),
+        SliverToBoxAdapter(child: _FilterRow()),
+        if (popularItems.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.only(top: 8),
+            sliver: SliverToBoxAdapter(
+              child: _PopularSection(items: popularItems),
+            ),
+          ),
+        if (nearbyItems.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            sliver: SliverToBoxAdapter(
+              child: _NearbySection(items: nearbyItems),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -75,13 +145,26 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Selamat Pagi,', style: TextStyle(color: _muted, fontSize: 11)),
+              Text(
+                'Selamat Pagi,',
+                style: TextStyle(color: _muted, fontSize: 11),
+              ),
               SizedBox(height: 2),
-              Text('Hai, Imam Zuhdi', style: TextStyle(color: _ink, fontSize: 16, fontWeight: FontWeight.w600)),
+              Text(
+                'Hai, Imam Zuhdi',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
-        _CircleIconButton(icon: Icons.notifications_none_rounded, onPressed: () {}),
+        _CircleIconButton(
+          icon: Icons.notifications_none_rounded,
+          onPressed: () {},
+        ),
       ],
     );
   }
@@ -120,13 +203,24 @@ class _SearchBar extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _line),
-        boxShadow: const [BoxShadow(color: Color(0x0D0F172A), blurRadius: 12, offset: Offset(0, 4))],
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D0F172A),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
           const Icon(Icons.search_rounded, color: _teal, size: 20),
           const SizedBox(width: 10),
-          const Expanded(child: Text('Cari kos di sekitarmu...', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14))),
+          const Expanded(
+            child: Text(
+              'Cari kos di sekitarmu...',
+              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+            ),
+          ),
           IconButton(
             onPressed: () {},
             tooltip: 'Filter pencarian',
@@ -179,9 +273,20 @@ class _FilterChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: TextStyle(color: active ? Colors.white : _muted, fontSize: 11, fontWeight: FontWeight.w700)),
+          Text(
+            label,
+            style: TextStyle(
+              color: active ? Colors.white : _muted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(width: 4),
-          Icon(Icons.keyboard_arrow_down_rounded, size: 13, color: active ? Colors.white : const Color(0xFF94A3B8)),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 13,
+            color: active ? Colors.white : const Color(0xFF94A3B8),
+          ),
         ],
       ),
     );
@@ -189,6 +294,10 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _PopularSection extends StatelessWidget {
+  const _PopularSection({required this.items});
+
+  final List<Item> items;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -201,9 +310,10 @@ class _PopularSection extends StatelessWidget {
           child: ListView.separated(
             padding: const EdgeInsets.only(left: 20, right: 20),
             scrollDirection: Axis.horizontal,
-            itemCount: _popularListings.length,
+            itemCount: items.length,
             separatorBuilder: (_, _) => const SizedBox(width: 16),
-            itemBuilder: (context, index) => _PopularCard(listing: _popularListings[index]),
+            itemBuilder: (context, index) =>
+                _PopularCard(listing: items[index]),
           ),
         ),
       ],
@@ -223,8 +333,24 @@ class _SectionHeading extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          Expanded(child: Text(title, style: const TextStyle(color: _ink, fontSize: 18, fontWeight: FontWeight.w700))),
-          Text(action, style: const TextStyle(color: _blue, fontSize: 12, fontWeight: FontWeight.w600)),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Text(
+            action,
+            style: const TextStyle(
+              color: _blue,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -234,7 +360,7 @@ class _SectionHeading extends StatelessWidget {
 class _PopularCard extends StatelessWidget {
   const _PopularCard({required this.listing});
 
-  final Listing listing;
+  final Item listing;
 
   @override
   Widget build(BuildContext context) {
@@ -246,46 +372,72 @@ class _PopularCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         elevation: 2,
         shadowColor: const Color(0x140F172A),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                _ListingImage(url: listing.imageUrl, height: 130),
-                Positioned(
-                  top: 10,
-                  left: 10,
-                  child: _RatingBadge(rating: listing.rating),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: _FavoriteButton(),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: InkWell(
+          onTap: () => Navigator.pushNamed(
+            context,
+            AppRoutes.detail,
+            arguments: listing,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
                 children: [
-                  _GenderTag(label: 'PUTRI', isMale: false),
-                  const SizedBox(height: 4),
-                  Text(listing.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined, size: 12, color: _muted),
-                      const SizedBox(width: 3),
-                      Expanded(child: Text(listing.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 11))),
-                    ],
+                  _ListingImage(url: listing.imageUrl, height: 130),
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: _RatingBadge(rating: listing.rating),
                   ),
-                  const SizedBox(height: 4),
-                  _Price(text: listing.price, color: _blue),
+                  Positioned(top: 10, right: 10, child: _FavoriteButton()),
                 ],
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _GenderTag(
+                      label: listing.isMale ? 'PUTRA' : 'PUTRI',
+                      isMale: listing.isMale,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      listing.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 12,
+                          color: _muted,
+                        ),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            listing.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: _muted, fontSize: 11),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    _Price(text: listing.price, color: _blue),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -293,17 +445,26 @@ class _PopularCard extends StatelessWidget {
 }
 
 class _NearbySection extends StatelessWidget {
+  const _NearbySection({required this.items});
+
+  final List<Item> items;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeading(title: 'Terdekat dari Kampusmu', action: 'Saring Kampus'),
+        const _SectionHeading(
+          title: 'Terdekat dari Kampusmu',
+          action: 'Saring Kampus',
+        ),
         const SizedBox(height: 12),
-        ..._nearbyListings.map((listing) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _NearbyCard(listing: listing),
-            )),
+        ...items.map(
+          (listing) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _NearbyCard(listing: listing),
+          ),
+        ),
       ],
     );
   }
@@ -312,45 +473,93 @@ class _NearbySection extends StatelessWidget {
 class _NearbyCard extends StatelessWidget {
   const _NearbyCard({required this.listing});
 
-  final Listing listing;
+  final Item listing;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _line), borderRadius: BorderRadius.circular(16)),
-      child: Row(
-        children: [
-          ClipRRect(borderRadius: BorderRadius.circular(12), child: _ListingImage(url: listing.imageUrl, width: 90, height: 90)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: _line),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () =>
+            Navigator.pushNamed(context, AppRoutes.detail, arguments: listing),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _ListingImage(
+                  url: listing.imageUrl,
+                  width: 90,
+                  height: 90,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _GenderTag(label: 'PUTRA', isMale: true),
-                    const Spacer(),
-                    _AvailabilityTag(text: listing.availability),
+                    Row(
+                      children: [
+                        _GenderTag(
+                          label: listing.isMale ? 'PUTRA' : 'PUTRI',
+                          isMale: listing.isMale,
+                        ),
+                        const Spacer(),
+                        _AvailabilityTag(text: listing.availability),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      listing.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            listing.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: _muted, fontSize: 11),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 12,
+                          color: Color(0xFFFBBF24),
+                        ),
+                        Text(
+                          listing.rating,
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    _Price(text: listing.price, color: _teal),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(listing.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(child: Text(listing.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 11))),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFBBF24)),
-                    Text(listing.rating, style: const TextStyle(color: _ink, fontSize: 11, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                _Price(text: listing.price, color: _teal),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -370,7 +579,10 @@ class _ListingImage extends StatelessWidget {
       width: width,
       height: height,
       fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => Container(color: const Color(0xFFE2E8F0), child: const Icon(Icons.home_work_outlined, color: _muted)),
+      errorBuilder: (_, _, _) => Container(
+        color: const Color(0xFFE2E8F0),
+        child: const Icon(Icons.home_work_outlined, color: _muted),
+      ),
     );
   }
 }
@@ -384,8 +596,25 @@ class _RatingBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: .94), borderRadius: BorderRadius.circular(8)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFBBF24)), const SizedBox(width: 2), Text(rating, style: const TextStyle(color: _ink, fontSize: 11, fontWeight: FontWeight.w700))]),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .94),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFBBF24)),
+          const SizedBox(width: 2),
+          Text(
+            rating,
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -396,8 +625,15 @@ class _FavoriteButton extends StatelessWidget {
     return Container(
       width: 28,
       height: 28,
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: .94), shape: BoxShape.circle),
-      child: const Icon(Icons.favorite_border_rounded, color: Color(0xFFEF4444), size: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .94),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(
+        Icons.favorite_border_rounded,
+        color: Color(0xFFEF4444),
+        size: 16,
+      ),
     );
   }
 }
@@ -412,8 +648,18 @@ class _GenderTag extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: isMale ? const Color(0xFFFEE2E2) : const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(4)),
-      child: Text(label, style: TextStyle(color: isMale ? const Color(0xFFEF4444) : _teal, fontSize: 9, fontWeight: FontWeight.w700)),
+      decoration: BoxDecoration(
+        color: isMale ? const Color(0xFFFEE2E2) : const Color(0xFFE0F2FE),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: isMale ? const Color(0xFFEF4444) : _teal,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
@@ -427,8 +673,18 @@ class _AvailabilityTag extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: const Color(0xFFD1FAE5), borderRadius: BorderRadius.circular(4)),
-      child: Text(text, style: const TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.w700)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD1FAE5),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFF10B981),
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
@@ -441,12 +697,30 @@ class _Price extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text.rich(TextSpan(text: text, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w700), children: const [TextSpan(text: '/bln', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w400))]));
+    return Text.rich(
+      TextSpan(
+        text: text,
+        style: TextStyle(
+          color: color,
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+        ),
+        children: const [
+          TextSpan(
+            text: '/bln',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w400),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 class _BottomNavigation extends StatelessWidget {
-  const _BottomNavigation({required this.selectedIndex, required this.onSelected});
+  const _BottomNavigation({
+    required this.selectedIndex,
+    required this.onSelected,
+  });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
@@ -461,7 +735,10 @@ class _BottomNavigation extends StatelessWidget {
       (Icons.person_outline_rounded, 'Profil'),
     ];
     return Container(
-      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: _line))),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: _line)),
+      ),
       child: SafeArea(
         top: false,
         child: Row(
@@ -475,9 +752,24 @@ class _BottomNavigation extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(items[index].$1, size: 22, color: index == selectedIndex ? _teal : const Color(0xFF94A3B8)),
+                        Icon(
+                          items[index].$1,
+                          size: 22,
+                          color: index == selectedIndex
+                              ? _teal
+                              : const Color(0xFF94A3B8),
+                        ),
                         const SizedBox(height: 4),
-                        Text(items[index].$2, style: TextStyle(color: index == selectedIndex ? _teal : _muted, fontSize: 10, fontWeight: index == selectedIndex ? FontWeight.w700 : FontWeight.w500)),
+                        Text(
+                          items[index].$2,
+                          style: TextStyle(
+                            color: index == selectedIndex ? _teal : _muted,
+                            fontSize: 10,
+                            fontWeight: index == selectedIndex
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -489,24 +781,3 @@ class _BottomNavigation extends StatelessWidget {
     );
   }
 }
-
-class Listing {
-  const Listing({required this.name, required this.location, required this.price, required this.rating, required this.imageUrl, this.availability = ''});
-
-  final String name;
-  final String location;
-  final String price;
-  final String rating;
-  final String imageUrl;
-  final String availability;
-}
-
-const _popularListings = [
-  Listing(name: 'Kos Nopal', location: 'RB Teknik 02, Bawah Terowongan', price: 'Rp 850.000', rating: '4.8', imageUrl: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=600&q=80'),
-  Listing(name: 'Griya Anggrek Executive', location: 'Seturan, Yogyakarta', price: 'Rp 1.200.000', rating: '4.9', imageUrl: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=600&q=80'),
-];
-
-const _nearbyListings = [
-  Listing(name: 'Kontrakan Ghozi', location: '300m dari Los Chicken', price: 'Rp 3.950.000', rating: '2.3', availability: 'SISA 2 KAMAR', imageUrl: 'https://images.unsplash.com/photo-1554995207-c18c203602cb?w=300&q=80'),
-  Listing(name: 'Kost Wafa', location: 'Belakang BC', price: 'Rp 1.500.000', rating: '4.6', availability: 'SISA 1 KAMAR', imageUrl: 'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?w=300&q=80'),
-];

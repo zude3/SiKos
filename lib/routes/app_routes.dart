@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/item.dart';
+import '../screens/detail_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/not_found_screen.dart';
@@ -9,6 +11,7 @@ class AppRoutes {
 
   static const String login = '/login';
   static const String home = '/home';
+  static const String detail = '/detail';
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     return switch (settings.name) {
@@ -17,7 +20,11 @@ class AppRoutes {
         settings: settings,
       ),
       home => MaterialPageRoute<void>(
-        builder: (_) => const HomeScreen(),
+        builder: (_) => HomeScreen(),
+        settings: settings,
+      ),
+      detail when settings.arguments is Item => MaterialPageRoute<void>(
+        builder: (_) => DetailScreen(item: settings.arguments! as Item),
         settings: settings,
       ),
       _ => null,
