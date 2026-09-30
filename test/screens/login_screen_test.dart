@@ -4,6 +4,30 @@ import 'package:tes1/main.dart';
 import 'package:tes1/screens/home_screen.dart';
 
 void main() {
+  testWidgets('login uses the 402 by 844 responsive design frame', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(402, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const SikosApp());
+
+    final frame = find.byKey(const Key('login-register'));
+    expect(frame, findsOneWidget);
+    expect(tester.getSize(frame), const Size(402, 844));
+
+    final frameWidget = tester.widget<Container>(frame);
+    expect(frameWidget.color, const Color(0xFFF7FBFB));
+
+    final layout = tester.widget<Column>(
+      find.descendant(of: frame, matching: find.byType(Column)).first,
+    );
+    expect(layout.mainAxisAlignment, MainAxisAlignment.spaceBetween);
+    expect(layout.crossAxisAlignment, CrossAxisAlignment.start);
+  });
+
   testWidgets('app starts on login and shows inline validation errors', (
     tester,
   ) async {
