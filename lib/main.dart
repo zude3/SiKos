@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'screens/home_screen.dart';
+import 'routes/app_routes.dart';
 
 void main() {
   runApp(const SikosApp());
@@ -20,7 +20,9 @@ class SikosApp extends StatelessWidget {
         fontFamily: 'Arial',
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      initialRoute: AppRoutes.login,
+      onGenerateRoute: AppRoutes.onGenerateRoute,
+      onUnknownRoute: AppRoutes.onUnknownRoute,
     );
   }
 }
