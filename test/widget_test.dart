@@ -13,9 +13,9 @@ void main() {
   testWidgets('renders the Sikos login screen', (WidgetTester tester) async {
     await tester.pumpWidget(const SikosApp());
 
-    expect(find.text('Masuk ke SiKos'), findsOneWidget);
-    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('SiKos'), findsOneWidget);
+    expect(find.text('Email Kampus / Umum'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
-    expect(find.text('Masuk'), findsOneWidget);
+    expect(find.text('Masuk Sekarang'), findsOneWidget);
   });
 }
