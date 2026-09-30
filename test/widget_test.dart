@@ -10,12 +10,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tes1/main.dart';
 
 void main() {
-  testWidgets('renders the Sikos home screen', (WidgetTester tester) async {
+  testWidgets('renders the Sikos login screen', (WidgetTester tester) async {
     await tester.pumpWidget(const SikosApp());
 
-    expect(find.text('Hai, Imam Zuhdi'), findsOneWidget);
-    expect(find.text('Kos Populer'), findsOneWidget);
-    expect(find.text('Terdekat dari Kampusmu'), findsOneWidget);
-    expect(find.text('Kontrakan Ghozi'), findsOneWidget);
+    expect(find.text('Masuk ke SiKos'), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.text('Masuk'), findsOneWidget);
   });
 }
