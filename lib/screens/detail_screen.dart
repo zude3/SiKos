@@ -1,14 +1,36 @@
 import 'package:flutter/material.dart';
 
 import '../models/item.dart';
+import '../routes/app_routes.dart';
 
-class DetailScreen extends StatelessWidget {
+class DetailScreen extends StatefulWidget {
   const DetailScreen({super.key, required this.item});
 
   final Item item;
 
   @override
+  State<DetailScreen> createState() => _DetailScreenState();
+}
+
+class _DetailScreenState extends State<DetailScreen> {
+  String? _catatan;
+
+  Future<void> _bukaFormCatatan() async {
+    final hasil = await Navigator.pushNamed<String>(
+      context,
+      AppRoutes.catatanForm,
+    );
+    if (!mounted || hasil == null) return;
+
+    setState(() => _catatan = hasil);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Catatan berhasil disimpan')));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: Text(item.title)),
@@ -80,6 +102,14 @@ class DetailScreen extends StatelessWidget {
           Text('Tentang kos', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(item.description),
+          const Divider(height: 32),
+          Text(_catatan == null ? 'Belum ada catatan.' : 'Catatan: $_catatan'),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _bukaFormCatatan,
+            icon: const Icon(Icons.edit_note),
+            label: const Text('Tulis Catatan'),
+          ),
         ],
       ),
     );

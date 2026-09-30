@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/item.dart';
+import '../screens/catatan_form_screen.dart';
 import '../screens/detail_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/login_screen.dart';
@@ -12,6 +13,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String home = '/home';
   static const String detail = '/detail';
+  static const String catatanForm = '/catatan-form';
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     return switch (settings.name) {
@@ -25,6 +27,10 @@ class AppRoutes {
       ),
       detail when settings.arguments is Item => MaterialPageRoute<void>(
         builder: (_) => DetailScreen(item: settings.arguments! as Item),
+        settings: settings,
+      ),
+      catatanForm => MaterialPageRoute<String>(
+        builder: (_) => const CatatanFormScreen(),
         settings: settings,
       ),
       _ => null,
