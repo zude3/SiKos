@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import '../data/item_repository.dart';
+import '../models/item.dart';
+import '../routes/app_routes.dart';
+import '../widgets/state_views.dart';
 
 const _ink = Color(0xFF1E293B);
 const _muted = Color(0xFF64748B);
 const _line = Color(0xFFE2E8F0);
 const _teal = Color(0xFF0D9488);
 const _blue = Color(0xFF0EA5E9);
+
+// (1) status tampilan
+enum ViewStatus { loading, success, error }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,6 +22,43 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
+
+  // (2) variabel state
+  final _repository = ItemRepository();
+  ViewStatus _status = ViewStatus.loading;
+  List<Item> _popular = [];
+  List<Item> _nearby = [];
+  String _errorMessage = '';
+  bool _simulateError = false; // ubah ke true untuk menguji error state
+
+  // (3) ambil data saat layar pertama kali dibuka
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  // (4) mengambil data + menangani error
+  Future<void> _loadItems() async {
+    if (_status != ViewStatus.loading) {
+      setState(() => _status = ViewStatus.loading);
+    }
+    try {
+      final data = await _repository.fetchItems(simulateError: _simulateError);
+      if (!mounted) return;
+      setState(() {
+        _popular = data.popular;
+        _nearby = data.nearby;
+        _status = ViewStatus.success;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _status = ViewStatus.error;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,14 +77,8 @@ class _HomeScreenState extends State<HomeScreen> {
               sliver: SliverToBoxAdapter(child: const _SearchBar()),
             ),
             SliverToBoxAdapter(child: _FilterRow()),
-            SliverPadding(
-              padding: const EdgeInsets.only(top: 8),
-              sliver: SliverToBoxAdapter(child: _PopularSection()),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              sliver: SliverToBoxAdapter(child: _NearbySection()),
-            ),
+            // (5) isi bagian bawah tergantung status
+            SliverToBoxAdapter(child: _buildContent()),
           ],
         ),
       ),
@@ -48,6 +86,41 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _selectedTab,
         onSelected: (index) => setState(() => _selectedTab = index),
       ),
+    );
+  }
+
+  // (6) memilih tampilan: loading / error / kosong / data
+  Widget _buildContent() {
+    return switch (_status) {
+      ViewStatus.loading => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 80),
+          child: LoadingView(),
+        ),
+      ViewStatus.error => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: ErrorView(message: _errorMessage, onRetry: _loadItems),
+        ),
+      ViewStatus.success => _buildData(),
+    };
+  }
+
+  Widget _buildData() {
+    if (_popular.isEmpty && _nearby.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 80),
+        child: EmptyView(message: 'Belum ada data.'),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        _PopularSection(items: _popular),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: _NearbySection(items: _nearby),
+        ),
+      ],
     );
   }
 }
@@ -189,6 +262,10 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _PopularSection extends StatelessWidget {
+  const _PopularSection({required this.items});
+
+  final List<Item> items;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -201,9 +278,9 @@ class _PopularSection extends StatelessWidget {
           child: ListView.separated(
             padding: const EdgeInsets.only(left: 20, right: 20),
             scrollDirection: Axis.horizontal,
-            itemCount: _popularListings.length,
+            itemCount: items.length,
             separatorBuilder: (_, _) => const SizedBox(width: 16),
-            itemBuilder: (context, index) => _PopularCard(listing: _popularListings[index]),
+            itemBuilder: (context, index) => _PopularCard(item: items[index]),
           ),
         ),
       ],
@@ -232,9 +309,9 @@ class _SectionHeading extends StatelessWidget {
 }
 
 class _PopularCard extends StatelessWidget {
-  const _PopularCard({required this.listing});
+  const _PopularCard({required this.item});
 
-  final Listing listing;
+  final Item item;
 
   @override
   Widget build(BuildContext context) {
@@ -246,46 +323,46 @@ class _PopularCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         elevation: 2,
         shadowColor: const Color(0x140F172A),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                _ListingImage(url: listing.imageUrl, height: 130),
-                Positioned(
-                  top: 10,
-                  left: 10,
-                  child: _RatingBadge(rating: listing.rating),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: _FavoriteButton(),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: InkWell(
+          // (7) kirim item yang dipilih ke layar Detail
+          onTap: () => Navigator.pushNamed(
+            context,
+            AppRoutes.detail,
+            arguments: item,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
                 children: [
-                  _GenderTag(label: 'PUTRI', isMale: false),
-                  const SizedBox(height: 4),
-                  Text(listing.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined, size: 12, color: _muted),
-                      const SizedBox(width: 3),
-                      Expanded(child: Text(listing.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 11))),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  _Price(text: listing.price, color: _blue),
+                  _ItemImage(url: item.imageUrl, height: 130),
+                  Positioned(top: 10, left: 10, child: _RatingBadge(rating: item.rating)),
+                  Positioned(top: 10, right: 10, child: _FavoriteButton()),
                 ],
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _GenderTag(label: 'PUTRI', isMale: false),
+                    const SizedBox(height: 4),
+                    Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_outlined, size: 12, color: _muted),
+                        const SizedBox(width: 3),
+                        Expanded(child: Text(item.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 11))),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    _Price(text: item.price, color: _blue),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -293,6 +370,10 @@ class _PopularCard extends StatelessWidget {
 }
 
 class _NearbySection extends StatelessWidget {
+  const _NearbySection({required this.items});
+
+  final List<Item> items;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -300,9 +381,9 @@ class _NearbySection extends StatelessWidget {
       children: [
         const _SectionHeading(title: 'Terdekat dari Kampusmu', action: 'Saring Kampus'),
         const SizedBox(height: 12),
-        ..._nearbyListings.map((listing) => Padding(
+        ...items.map((item) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: _NearbyCard(listing: listing),
+              child: _NearbyCard(item: item),
             )),
       ],
     );
@@ -310,54 +391,67 @@ class _NearbySection extends StatelessWidget {
 }
 
 class _NearbyCard extends StatelessWidget {
-  const _NearbyCard({required this.listing});
+  const _NearbyCard({required this.item});
 
-  final Listing listing;
+  final Item item;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _line), borderRadius: BorderRadius.circular(16)),
-      child: Row(
-        children: [
-          ClipRRect(borderRadius: BorderRadius.circular(12), child: _ListingImage(url: listing.imageUrl, width: 90, height: 90)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        // (7) kirim item yang dipilih ke layar Detail
+        onTap: () => Navigator.pushNamed(
+          context,
+          AppRoutes.detail,
+          arguments: item,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(border: Border.all(color: _line), borderRadius: BorderRadius.circular(16)),
+          child: Row(
+            children: [
+              ClipRRect(borderRadius: BorderRadius.circular(12), child: _ItemImage(url: item.imageUrl, width: 90, height: 90)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _GenderTag(label: 'PUTRA', isMale: true),
-                    const Spacer(),
-                    _AvailabilityTag(text: listing.availability),
+                    Row(
+                      children: [
+                        _GenderTag(label: 'PUTRA', isMale: true),
+                        const Spacer(),
+                        _AvailabilityTag(text: item.availability),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(child: Text(item.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 11))),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFBBF24)),
+                        Text(item.rating, style: const TextStyle(color: _ink, fontSize: 11, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    _Price(text: item.price, color: _teal),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(listing.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(child: Text(listing.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 11))),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFBBF24)),
-                    Text(listing.rating, style: const TextStyle(color: _ink, fontSize: 11, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                _Price(text: listing.price, color: _teal),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _ListingImage extends StatelessWidget {
-  const _ListingImage({required this.url, this.width, this.height});
+class _ItemImage extends StatelessWidget {
+  const _ItemImage({required this.url, this.width, this.height});
 
   final String url;
   final double? width;
@@ -370,7 +464,12 @@ class _ListingImage extends StatelessWidget {
       width: width,
       height: height,
       fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => Container(color: const Color(0xFFE2E8F0), child: const Icon(Icons.home_work_outlined, color: _muted)),
+      errorBuilder: (_, _, _) => Container(
+        width: width,
+        height: height,
+        color: const Color(0xFFE2E8F0),
+        child: const Icon(Icons.home_work_outlined, color: _muted),
+      ),
     );
   }
 }
@@ -489,24 +588,3 @@ class _BottomNavigation extends StatelessWidget {
     );
   }
 }
-
-class Listing {
-  const Listing({required this.name, required this.location, required this.price, required this.rating, required this.imageUrl, this.availability = ''});
-
-  final String name;
-  final String location;
-  final String price;
-  final String rating;
-  final String imageUrl;
-  final String availability;
-}
-
-const _popularListings = [
-  Listing(name: 'Kos Nopal', location: 'RB Teknik 02, Bawah Terowongan', price: 'Rp 850.000', rating: '4.8', imageUrl: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=600&q=80'),
-  Listing(name: 'Griya Anggrek Executive', location: 'Seturan, Yogyakarta', price: 'Rp 1.200.000', rating: '4.9', imageUrl: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=600&q=80'),
-];
-
-const _nearbyListings = [
-  Listing(name: 'Kontrakan Ghozi', location: '300m dari Los Chicken', price: 'Rp 3.950.000', rating: '2.3', availability: 'SISA 2 KAMAR', imageUrl: 'https://images.unsplash.com/photo-1554995207-c18c203602cb?w=300&q=80'),
-  Listing(name: 'Kost Wafa', location: 'Belakang BC', price: 'Rp 1.500.000', rating: '4.6', availability: 'SISA 1 KAMAR', imageUrl: 'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?w=300&q=80'),
-];
