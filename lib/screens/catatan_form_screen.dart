@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../utils/validators.dart';
 
-// Form Catatan mengembalikan String ke layar Detail.
 class CatatanFormScreen extends StatefulWidget {
   const CatatanFormScreen({super.key});
 

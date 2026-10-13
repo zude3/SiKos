@@ -7,7 +7,6 @@ import '../screens/home_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/not_found_screen.dart';
 
-// Named route untuk seluruh alur praktikum.
 class AppRoutes {
   AppRoutes._();
 

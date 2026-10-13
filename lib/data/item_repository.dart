@@ -24,12 +24,10 @@ class ItemRepository {
     ),
   ];
 
-  /// Mengambil daftar item.
-  /// simulateError: true -> sengaja dibuat gagal untuk menguji error state.
   Future<List<Item>> fetchItems({bool simulateError = false}) async {
     await Future.delayed(
       const Duration(seconds: 2),
-    ); // simulasi waktu tunggu server
+    ); 
     if (simulateError) {
       throw Exception('Gagal memuat data. Periksa koneksi internet.');
     }

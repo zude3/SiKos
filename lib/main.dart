@@ -18,7 +18,7 @@ class SikosApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D9488)),
         scaffoldBackgroundColor: const Color(0xFFF7FBFB),
         fontFamily: 'Arial',
-        useMaterial3: true,
+        useMaterial3: true,   
       ),
       // Mulai dari login dan gunakan named routes.
       initialRoute: AppRoutes.login,
