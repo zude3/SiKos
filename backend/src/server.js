@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+require('./middleware/auth').getJwtSecret();
 const app = require('./app');
 
 const port = Number(process.env.PORT) || 3000;
@@ -8,3 +9,5 @@ const port = Number(process.env.PORT) || 3000;
 app.listen(port, '0.0.0.0', () => {
   console.log(`SiKos backend berjalan di port ${port}`);
 });
+
+require('./jobs/verifikasiSimulator').start();

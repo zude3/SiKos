@@ -5,6 +5,9 @@ const cors = require('cors');
 const db = require('./config/db');
 const asyncHandler = require('./utils/asyncHandler');
 const kosRoutes = require('./routes/kos');
+const authRoutes = require('./routes/auth');
+const billingRoutes = require('./routes/tagihan');
+const { errorHandler } = require('./middleware/errors');
 
 const app = express();
 
@@ -12,6 +15,9 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
+
+app.use('/auth', authRoutes);
+app.use('/tagihan', billingRoutes);
 
 //cek db aiven
 app.get(
@@ -28,9 +34,6 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Endpoint tidak ditemukan' });
 });
 
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ message: 'Terjadi kesalahan pada server' });
-});
+app.use(errorHandler);
 
 module.exports = app;
