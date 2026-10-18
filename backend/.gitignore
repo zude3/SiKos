@@ -2,9 +2,18 @@ node_modules/
 .env
 .env.*
 !.env.example
+postman/
+database/*
+!database/*.sql
+uploads/
 
+# File yang diunggah pengguna saat berjalan (foto komplain, bukti bayar, dll.)
 uploads/*
 !uploads/.gitkeep
+
+# Sertifikat bukan rahasia, tetapi dibagikan bersama kredensial.
+# Hapus baris ini bila tim ingin meng-commit ca.pem ke repo.
+certs/*.pem
 
 .DS_Store
 *.log
