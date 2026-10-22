@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../features/komplain/komplain_list_page.dart';
+
 const _ink = Color(0xFF1E293B);
 const _muted = Color(0xFF64748B);
 const _line = Color(0xFFE2E8F0);
@@ -46,9 +48,19 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: _BottomNavigation(
         selectedIndex: _selectedTab,
-        onSelected: (index) => setState(() => _selectedTab = index),
+        onSelected: _onTabSelected,
       ),
     );
+  }
+
+  void _onTabSelected(int index) {
+    if (index == 3) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const KomplainListPage()),
+      );
+      return;
+    }
+    setState(() => _selectedTab = index);
   }
 }
 
